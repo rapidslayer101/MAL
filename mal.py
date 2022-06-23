@@ -1,54 +1,13 @@
-import requests, re, random, time
-from enclib import search
+import requests, re
+from re import search as sr
 
 
-def gogo_get_download(gogo_category_page, anime_nme):
-    print(f"\nFinding gogoanime.pe watch pages for {anime_nme} --> {gogo_category_page}")
-    ep_num = 0
-    size_total = 0.00
-    time_lst = []
-    downloadable = []
-    while True:
-        ep_num += 1
-        page = f"https://gogoanime.pe/{gogo_category_page[30:]}-episode-{ep_num}"
-        download_link = search(requests.get(page).content, 'dowloads"><a href="', '" target=')
-        if not download_link:
-            break
-        data = requests.get(download_link).content
-        size = search(data, 'Size:</label><span id="filesize">', "</span>")
-        duration = search(data, 'duration">', "</span>")
-        res = search(data, 'Res:</label><span id="filesize">', "</span>")
-        try:
-            download = "https://storage" + search(data, 'href="https://storage', '" download>Download')
-        except:
-            download = "NULL"  # todo trigger alternative
-
-        # flag 720p, total download size, total duration
-        if res != "1920x1080":
-            if res == "1280x720":
-                res = "1280x720 <-- WARNING 720p FILE"  # todo trigger alternative
-            else:
-                res += " <-- WARNING VERY BAD DOWNLOAD. FIND ALTERNATIVE"  # todo trigger alternative
-
-        size_int, null = size.split(" MB")
-        if not size_int:
-            size_int, null = size.split(" GB")
-        size_total += float(size_int)
-
-        time_lst.append(duration)
-        print(f"{anime_nme} Ep {ep_num} {download} {size} {duration} {res}")
-        downloadable.append(f"{anime_nme}, Ep {ep_num}, {download}, {size}, {duration}, {res}")
-
-    dur_total = 0
-    for tm in time_lst:
-        time_parts = [int(s) for s in tm.split(':')]
-        dur_total += (time_parts[0] * 60 + time_parts[1]) * 60 + time_parts[2]
-    total_secs, sec = divmod(dur_total, 60)
-    hr, min = divmod(total_secs, 60)
-    print(f"Total size and duration for all {ep_num-1} above, size:"
-          f" {round(size_total/1000, 2)}GB, dur: %d:%02d:%02d" % (hr, min, sec))
-
-    input("\nWhat would you like to download? ")
+def search(data, filter_fr, filter_to):
+    m = sr(f"""{filter_fr}(.+?){filter_to}""", str(data))
+    if m:
+        return m.group(1)
+    else:
+        return None
 
 
 def get_links(a, name):
@@ -111,6 +70,7 @@ def get_links(a, name):
 load_user_data = True
 
 if load_user_data:
+    watched_list = {}
     user_anime_list = requests.get("https://myanimelist.net/animelist/rapidslayer101").content
     #user_anime_list = requests.get("https://myanimelist.net/animelist/BappoHacko").content
     table_data = search(user_anime_list, '<table class="list-table" data-items="',
@@ -150,6 +110,10 @@ if load_user_data:
                     f" scored {score}, watched eps {watched}/{total_eps}")
         print(f"https://myanimelist.net/anime/{anime_id} -- {anime_title} - {media_type} ({air_type})({mpaa}): {status},"
               f" scored {score}, watched eps {watched}/{total_eps}")
+        if int(watched) != int(total_eps):
+            watched_list.update({anime_id: watched})
+        else:
+            watched_list.update({anime_id: "C"})
 
         watched_ttl += int(watched)
 
@@ -169,7 +133,10 @@ def anime_data(url):
     ep_duration = search(page_data, "Duration:</span>", "</div>")\
         .replace("\\n", "").replace("   ", "").replace("  ", "")
 
-    genres = search(page_data, "Genres:</span>", "</div>").split('style="display: none">')
+    try:
+        genres = search(page_data, "Genres:</span>", "</div>").split('style="display: none">')
+    except AttributeError:
+        genres = "NULL"
     genre_lst = "".join([genre.split("</span>")[0]+", " for genre in genres[1:]])[:-2]
 
     if name_data.endswith(" "):
@@ -207,86 +174,144 @@ def anime_data(url):
 
 anime_finder = True
 
-if anime_finder:
-    anime_name = input("Anime name: ").replace("(", "").replace(")", "")  # or link
-    # print("\nEnter 'y' to include related anime search, leave blank for just download pages")
-    # if input().lower() == "y": # todo toggles the searching of related anime
-
-    print(f"\nSearching for: {anime_name}")
-    print(f"\nSearching for: {anime_name}")
-    anime_name = anime_name.replace(": ", "__")
-    page = f"https://myanimelist.net/anime.php?q={anime_name.replace(' ', '+')}&cat=anime"
-    print(f"Finding MAL page --> {page}")
-    anime_mal_link = get_links(requests.get(page).content, anime_name)
-    if type(anime_mal_link) == list:
-        if len(anime_mal_link) == 1:
-            anime_mal_link = str(anime_mal_link)[2:-2]
-        else:
-            print("Autodetect failed, enter a number from below")
-            counter = 0
-            for url in anime_mal_link:
-                # todo redo the genre and season 2 links removal
-                counter += 1
-                if not counter > 30:
-                    print(f"{counter} - {url}")
-            while True:
-                try:
-                    anime_mal_link = anime_mal_link[int(input())-1]
-                    break
-                except:
-                    print("Invalid input")
-    print(f"MAL page found, collecting page data <--> {anime_mal_link}")
-
-    anime_data(anime_mal_link)
-    anime_name_old = anime_name.replace("__", " ")
-
-
-#start_point = int(input("Input last number in txt: "))+1
-#for i in range(53000-start_point):
-#    try:
-#        anime_data(f"https://myanimelist.net/anime/{i+start_point}")
-#        time.sleep(1)
-#    except AttributeError:
-#        print(f"Error {i+start_point}")
-#        time.sleep(0.35)
-#input()
-# grab name out of MAL url
-
-anime_name = anime_mal_link.split("/")[-1].replace("__", ": ").replace("_", " ")
-
-# generate watch sites
-
 while True:
-    lang = input("\nSUB or DUB: ").lower()
-    if lang == "sub":
-        sub = True
-        break
-    if lang == "dub":
-        print("BELOW LINKS MAY NOT HAVE ANY RESULTS AS DUB IS SELECTED")
-        sub = False
-        break
+
+    if anime_finder:
+        anime_name = input("Anime name: ").replace("(", "").replace(")", "")  # or link
+        # print("\nEnter 'y' to include related anime search, leave blank for just download pages")
+        # if input().lower() == "y": # todo toggles the searching of related anime
+
+        print(f"\nSearching for: {anime_name}")
+        anime_name = anime_name.replace(": ", "__")
+        page = f"https://myanimelist.net/anime.php?q={anime_name.replace(' ', '+')}&cat=anime"
+        print(f"Finding MAL page --> {page}")
+        anime_mal_link = get_links(requests.get(page).content, anime_name)
+        if type(anime_mal_link) == list:
+            if len(anime_mal_link) == 1:
+                anime_mal_link = str(anime_mal_link)[2:-2]
+            else:
+                print("Autodetect failed, enter a number from below")
+                counter = 0
+                for url in anime_mal_link:
+                    # todo redo the genre and season 2 links removal
+                    counter += 1
+                    if not counter > 30:
+                        print(f"{counter} - {url}")
+                while True:
+                    try:
+                        anime_mal_link = anime_mal_link[int(input())-1]
+                        break
+                    except:
+                        print("Invalid input")
+        print(f"MAL page found, collecting page data <--> {anime_mal_link}")
+
+        anime_data(anime_mal_link)
+        anime_name_old = anime_name.replace("__", " ")
 
 
-print(f"{lang.upper()} pages for 9anime.to and gogoanime.pe")
-# 9anime.to
-if sub:
-    print(f"https://9anime.to/filter?language%5B%5D=subbed&keyword={anime_name.replace(' ', '+').replace(':', '%3A')}")
-else:
-    print(f"https://9anime.to/filter?language%5B%5D=dubbed&keyword={anime_name.replace(' ', '+').replace(':', '%3A')}")
+    #start_point = int(input("Input last number in txt: "))+1
+    #for i in range(53000-start_point):
+    #    try:
+    #        anime_data(f"https://myanimelist.net/anime/{i+start_point}")
+    #        time.sleep(1)
+    #    except AttributeError:
+    #        print(f"Error {i+start_point}")
+    #        time.sleep(0.35)
+    #input()
+    # grab name out of MAL url
 
-# gogoanime.pe
-try:
-    if sub:
-        page = f"https://gogoanime.pe//search.html?keyword={anime_name.replace(' ', '%20')}"
+    anime_id = anime_mal_link.split("anime/")[-1].split("/")[0]
+    if anime_id in watched_list:
+        ep_num = watched_list[anime_id]
+        if ep_num == "C":
+            print(f"\nYou have completed {anime_name_old}")
+        else:
+            print(f"\nYou have watched {ep_num} episodes of {anime_name_old}")
+            ep_num = int(ep_num)
     else:
-        page = f"https://gogoanime.pe//search.html?keyword={anime_name.replace(' ', '%20')}%20(Dub)"
-    data = requests.get(page).content
-    gogo_category_page = "https://gogoanime.pe/category/" + search(data, '<a href="/category/', '" title=')
-    print(f"{gogo_category_page}")
-except:
-    print("Special char caused an error")  # todo fix this
+        print(f"\nYou have not watched {anime_name_old}")
+        ep_num = 0
 
-# generate download links
+    anime_name = anime_mal_link.split("/")[-1].replace("__", ": ").replace("_", " ")
 
-input("Hit enter to collect download links")
-gogo_get_download(gogo_category_page, anime_name)
+    # generate watch sites
+
+    lang = "SUB"
+    sub = True
+    #while True:
+    #    lang = input("\nSUB or DUB: ").lower()
+    #    if lang == "sub":
+    #        sub = True
+    #        break
+    #    if lang == "dub":
+    #        print("BELOW LINKS MAY NOT HAVE ANY RESULTS AS DUB IS SELECTED")
+    #        sub = False
+    #        break
+
+    if ep_num != "C":
+        #print(f"{lang.upper()} pages for 9anime.to and gogoanime.pe")
+        # 9anime.to
+        if sub:
+            print(f"https://9anime.to/filter?language%5B%5D=subbed&keyword={anime_name.replace(' ', '+').replace(':', '%3A')}")
+        else:
+            print(f"https://9anime.to/filter?language%5B%5D=dubbed&keyword={anime_name.replace(' ', '+').replace(':', '%3A')}")
+
+        # gogoanime.pe
+        try:
+            if sub:
+                page = f"https://gogoanime.pe//search.html?keyword={anime_name.replace(' ', '%20')}"
+            else:
+                page = f"https://gogoanime.pe//search.html?keyword={anime_name.replace(' ', '%20')}%20(Dub)"
+            data = requests.get(page).content
+            gogo_category_page = "https://gogoanime.pe/category/" + search(data, '<a href="/category/', '" title=')
+            print(f"{gogo_category_page}")
+        except:
+            print("Special char caused an error")  # todo fix this
+
+        # generate download links
+
+        print(f"\nFinding gogoanime.pe watch pages for {anime_name} --> {gogo_category_page}")
+        size_total = 0.00
+        time_lst = []
+        #downloadable = []
+        while True:
+            ep_num += 1
+            page = f"https://gogoanime.pe/{gogo_category_page[30:]}-episode-{ep_num}"
+            download_link = search(requests.get(page).content, 'dowloads"><a href="', '" target=')
+            if not download_link:
+                break
+            d_page = requests.get(download_link).content
+            size = search(d_page, 'Size:</label><span id="filesize">', "</span>")
+            duration = search(d_page, 'duration">', "</span>")
+            res = search(d_page, 'Res:</label><span id="filesize">', "</span>")
+            #try:
+            #    download = "https://storage" + search(d_page, 'href="https://storage', '" download>Download')
+            #except:
+            #    download = "NULL"  # todo trigger alternative
+
+            # flag 720p, total download size, total duration
+            if res != "1920x1080":
+                if res == "1280x720":
+                    res = "1280x720 <-- WARNING 720p FILE"  # todo trigger alternative
+                else:
+                    res += " <-- WARNING VERY BAD DOWNLOAD. FIND ALTERNATIVE"  # todo trigger alternative
+
+            size_int, null = size.split(" MB")
+            if not size_int:
+                size_int, null = size.split(" GB")
+            size_total += float(size_int)
+
+            time_lst.append(duration)
+            print(f"{anime_name} Ep {ep_num} {size} {duration} {res} -- {download_link}")
+            #downloadable.append(f"{anime_nme}, Ep {ep_num}, {download}, {size}, {duration}, {res}")
+
+        dur_total = 0
+        for tm in time_lst:
+            time_parts = [int(s) for s in tm.split(':')]
+            dur_total += (time_parts[0] * 60 + time_parts[1]) * 60 + time_parts[2]
+        total_secs, sec = divmod(dur_total, 60)
+        hr, min = divmod(total_secs, 60)
+        print(f"Total size and duration for all {ep_num-1} above, size:"
+              f" {round(size_total/1000, 2)}GB, dur: %d:%02d:%02d"%(hr, min, sec))
+
+    print("\nLooping script\n")
