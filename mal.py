@@ -152,9 +152,9 @@ def anime_data(url):
     except:
         dur_ttl = ""
 
-    with open("mal_data.txt", "a+") as f:
-        f.write(f"{url} --- {name_data} -- {eps} Episodes with a duration of {ep_duration}{dur_ttl},"
-                f" Score: {score}, Ranked: {rank}, Popularity: {popularity}, Members: {members}, Genres: {genre_lst}\n")
+    #with open("mal_data.txt", "a+") as f:
+    #    f.write(f"{url} --- {name_data} -- {eps} Episodes with a duration of {ep_duration}{dur_ttl},"
+    #            f" Score: {score}, Ranked: {rank}, Popularity: {popularity}, Members: {members}, Genres: {genre_lst}\n")
     print(f"\n{url} --- {name_data}\n{eps} Episodes with a duration of {ep_duration}{dur_ttl},"
           f" Score: {score}, Ranked: {rank}, Popularity: {popularity}, Members: {members}, Genres: {genre_lst}")
 
@@ -274,6 +274,7 @@ while True:
         size_total = 0.00
         time_lst = []
         #downloadable = []
+        ep_save = ep_num
         while True:
             ep_num += 1
             page = f"https://gogoanime.pe/{gogo_category_page[30:]}-episode-{ep_num}"
@@ -311,7 +312,7 @@ while True:
             dur_total += (time_parts[0] * 60 + time_parts[1]) * 60 + time_parts[2]
         total_secs, sec = divmod(dur_total, 60)
         hr, min = divmod(total_secs, 60)
-        print(f"Total size and duration for all {ep_num-1} above, size:"
+        print(f"Total size and duration for all {ep_num-1-ep_save} above, size:"
               f" {round(size_total/1000, 2)}GB, dur: %d:%02d:%02d"%(hr, min, sec))
 
     print("\nLooping script\n")
